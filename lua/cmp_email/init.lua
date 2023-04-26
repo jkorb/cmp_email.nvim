@@ -1,68 +1,64 @@
 local source = {}
 
-local utils = require('cmp_email.utils')
+local utils = require("cmp_email.utils")
 
 function source.new()
-  return setmetatable({}, {__index = source})
+	return setmetatable({}, { __index = source })
 end
 
 function source:get_keyword_pattern()
-  -- Add dot to existing keyword characters (\k).
-  return [[\%(\k\|\.\|[:blank:]\)\+]]
+	-- Add dot to existing keyword characters (\k).
+	return [[\(\S\)\+]]
 end
 
 local function get_items()
+	local items = {}
 
-  local items = {}
+	local contacts = vim.fn.system("mu cfind --personal")
 
-  local contacts = vim.fn.system('mu cfind --personal')
+	-- go through the contacts line by line
+	for contact in contacts:gmatch("[^\r\n]+") do
+		local email = contact:match("[A-Za-z0-9%.%%%+%-]+@[A-Za-z0-9%.%%%+%-]+%.%w%w%w?%w?")
 
-  -- go through the contacts line by line
-  for contact in contacts:gmatch("[^\r\n]+") do
+		if email ~= nil then
+			local item = ""
+			local display_item = ""
 
-    local email = contact:match("[A-Za-z0-9%.%%%+%-]+@[A-Za-z0-9%.%%%+%-]+%.%w%w%w?%w?")
+			local name = string.gsub(contact, email, "")
 
-    if email ~= nil then
-      local item = ""
-      local display_item = ""
+			if name ~= "" and name ~= " " then
+				item = '"' .. utils.trim(name) .. '" '
+				display_item = utils.trim(name) .. ", " .. utils.trim(email)
+			else
+				item = ""
+			end
 
-      local name = string.gsub(contact, email, "")
+			item = item .. "<" .. utils.trim(email) .. ">"
 
-      if name ~= "" and name ~= " " then
-        item = '\"' .. utils.trim(name) .. '\" '
-        display_item = utils.trim(name) .. ', ' .. utils.trim(email)
-      else
-        item = ""
-      end
+			table.insert(items, {
+				label = display_item,
+				sortTex = display_item,
+				filterText = display_item,
+				insertText = item,
+				preselect = false,
+			})
+		end
+	end
 
-      item = item .. '<' .. utils.trim(email) .. '>'
-
-      table.insert(items, {
-        label      = display_item,
-        sortTex    = display_item,
-        filterText = display_item,
-        insertText = item,
-        preselect = false,
-      })
-    end
-
-  end
-
-  return items
+	return items
 end
 
 function source:complete(request, callback)
+	local line = request.context.cursor_line
 
-  local line = request.context.cursor_line
-
-  if utils.is_address_line(line) then
-    callback {
-      items = get_items(),
-      isIncomplete = true,
-    }
-  else
-    callback({isIncomplete = true})
-  end
+	if utils.is_address_line(line) then
+		callback({
+			items = get_items(),
+			isIncomplete = true,
+		})
+	else
+		callback({ isIncomplete = true })
+	end
 end
 
 return source
